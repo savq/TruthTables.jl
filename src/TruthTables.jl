@@ -2,7 +2,7 @@ module TruthTables
 
 using NamedArrays: NamedArray, setnames!
 
-export truth_table
+export @truth_table
 
 const operators = [:&&, :||, :!]
 
