@@ -1,26 +1,36 @@
+# This module serves as a simple example of what macros can do.
+"TruthTables exports the macro @truth_table"
 module TruthTables
 
-using NamedArrays: NamedArray, setnames!
+# Used for pretty printing.
+using NamedArrays: NamedArray
 
 export @truth_table
 
-const operators = [:&&, :||, :!]
+# These functions have different precedence rules than the actual
+# short-circuiting operators. Use parentheses.
+∧(p::Bool, q::Bool) = p && q
+∨(p::Bool, q::Bool) = p || q
+⟹(p::Bool, q::Bool) = if p; q else true end
 
+const operators = [
+    :&&, :||,     # special forms
+    :!, :⊻,       # standard functions
+    :∧, :∨, :⟹    # defined above
+   ]
+
+"""
+Take a boolean expression and return a truth table
+
+The truth table is a NamedArray whose columns are variables and sub-expressions
+of the input expression.
+"""
 macro truth_table(expr)
-    # Walk the expression and push the variables found to a vector `vars`:
-    vars = Vector{Symbol}([])
-    find_vars!(var::Symbol) = !(var in operators) && !(var in vars) && push!(vars, var)
-    find_vars!(expr::Expr) = find_vars!.(expr.args)
-    find_vars!(::Bool) = nothing
-
-    find_vars!(expr)
-
+    subexprs, vars = get_sub_exprs(expr)
 
     # Generate nested for loops where each variable is given a truth value:
     vals = []
-    ex = quote
-        push!($vals, [$(vars...), $expr]) # there's probably a better way to do this
-    end
+    ex = :(push!($vals, [$(vars...), $(subexprs...)])) # there's probably a better way to do this
 
     for i in reverse(vars)
         ex = quote
@@ -30,13 +40,29 @@ macro truth_table(expr)
         end
     end
 
-    # Crate the truth table
+    # Create and return truth table
     eval(ex)
-    table = NamedArray(Matrix{Bool}(hcat(vals...)'))
-    setnames!(table, [string.(vars)..., string(expr)], 2)
-    return table
+    NamedArray(
+        Matrix(hcat(vals...)'),
+        (1:(2^length(vars)), [string.(vars)..., string.(subexprs)...])
+        )
 end
 
-test_tt() = @truth_table (a && b && (!c)) || ((!a) && c && (b || d))
+"Returns two vectors: a vector of sub-expressions and a vector of variables."
+function get_sub_exprs(expr::Expr)
+    sub_exprs = Vector{Expr}([])
+    vars = Vector{Symbol}([])
+
+    # Traverse the expression using multiple dispatch
+    function walk_expr!(expr::Expr)
+        walk_expr!.(expr.args)    # mind the dot
+        push!(sub_exprs, expr)
+    end
+    walk_expr!(var::Symbol) = !(var in operators) && !(var in vars) && push!(vars, var)
+    walk_expr!(::Bool) = nothing
+
+    walk_expr!(expr)
+    return sub_exprs, vars
+end
 
 end #mod
