@@ -8,6 +8,7 @@ using NamedArrays: NamedArray
 export @truth_table
 
 # TODO: Support user defined functions
+¬(p::Bool) = !p
 ∧(p::Bool, q::Bool) = p && q
 ∨(p::Bool, q::Bool) = p || q
 ⟹(p::Bool, q::Bool) = if p; q else true end
