@@ -52,8 +52,8 @@ function get_sub_exprs(expr::Expr)
 
     # Traverse the expression using multiple dispatch
     function walk_expr!(expr::Expr)
-        n = (expr == :call) ? 2 : 1    # Ignore function names
-        walk_expr!.(expr.args[n:end])  # Mind the dot
+        n = (expr.head == :call) ? 2 : 1    # Ignore function names
+        walk_expr!.(expr.args[n:end])       # Mind the dot
         push!(sub_exprs, expr)
     end
     walk_expr!(var::Symbol) = !(var in vars) && push!(vars, var)
