@@ -7,17 +7,12 @@ using NamedArrays: NamedArray
 
 export @truth_table
 
-# These functions have different precedence rules than the actual
-# short-circuiting operators. Use parentheses.
+# TODO: Support user defined functions
 ∧(p::Bool, q::Bool) = p && q
 ∨(p::Bool, q::Bool) = p || q
 ⟹(p::Bool, q::Bool) = if p; q else true end
+⟺(p::Bool, q::Bool) = p === q
 
-const operators = [
-    :&&, :||,     # special forms
-    :!, :⊻,       # standard functions
-    :∧, :∨, :⟹    # defined above
-   ]
 
 """
 Take a boolean expression and return a truth table
@@ -28,9 +23,9 @@ of the input expression.
 macro truth_table(expr)
     subexprs, vars = get_sub_exprs(expr)
 
-    # Generate nested for loops where each variable is given a truth value:
+    # Generate nested for loops where each variable is given a truth value
     vals = []
-    ex = :(push!($vals, [$(vars...), $(subexprs...)])) # there's probably a better way to do this
+    ex = :(push!($vals, [$(vars...), $(subexprs...)]))    # FIXME: Preallocate vals
 
     for i in reverse(vars)
         ex = quote
@@ -44,9 +39,11 @@ macro truth_table(expr)
     eval(ex)
     NamedArray(
         Matrix(hcat(vals...)'),
-        (1:(2^length(vars)), [string.(vars)..., string.(subexprs)...])
-        )
+        (1:(2^length(vars)), [string.(vars)..., string.(subexprs)...]),
+        ("", "")
+    )
 end
+
 
 "Returns two vectors: a vector of sub-expressions and a vector of variables."
 function get_sub_exprs(expr::Expr)
@@ -55,14 +52,15 @@ function get_sub_exprs(expr::Expr)
 
     # Traverse the expression using multiple dispatch
     function walk_expr!(expr::Expr)
-        walk_expr!.(expr.args)    # mind the dot
+        n = (expr == :call) ? 2 : 1    # Ignore function names
+        walk_expr!.(expr.args[n:end])  # Mind the dot
         push!(sub_exprs, expr)
     end
-    walk_expr!(var::Symbol) = !(var in operators) && !(var in vars) && push!(vars, var)
+    walk_expr!(var::Symbol) = !(var in vars) && push!(vars, var)
     walk_expr!(::Bool) = nothing
 
     walk_expr!(expr)
     return sub_exprs, vars
 end
 
-end #mod
+end #module
