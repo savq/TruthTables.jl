@@ -23,26 +23,20 @@ of the input expression.
 """
 macro truth_table(expr)
     subexprs, vars = get_sub_exprs(expr)
+    c = gensym(:c)
+    vals = gensym(:vals)
+    ex = :($vals[$c+=1, :] = [$(vars...), $(subexprs...)])
 
-    # Generate nested for loops where each variable is given a truth value
-    vals = []
-    ex = :(push!($vals, [$(vars...), $(subexprs...)]))    # FIXME: Preallocate vals
-
-    for i in reverse(vars)
-        ex = quote
-            for $i in [true, false]
-                $ex
-            end
-        end
+    for i in vars
+        ex = :(for $i in [true, false]; $ex end)
     end
 
-    # Create and return truth table
-    eval(ex)
-    NamedArray(
-        Matrix(hcat(vals...)'),
-        (1:(2^length(vars)), [string.(vars)..., string.(subexprs)...]),
-        ("", "")
-    )
+    quote
+        $c = 0
+        $vals = Matrix{Bool}(undef, 2^length($vars), length($vars) + length($subexprs))
+        $ex
+        NamedArray($vals, (1:2^length($vars), string.([$vars..., $subexprs...])), ("Val.", "Pred."))
+   end
 end
 
 
@@ -61,7 +55,7 @@ function get_sub_exprs(expr::Expr)
     walk!(::Bool) = nothing
 
     walk!(expr)
-    return sub_exprs, vars
+    return sub_exprs, reverse(vars)
 end
 
 end #module
