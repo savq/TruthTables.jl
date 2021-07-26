@@ -48,20 +48,21 @@ end
 
 "Returns two vectors: a vector of sub-expressions and a vector of variables."
 function get_sub_exprs(expr::Expr)
-    sub_exprs = Vector{Expr}([])
-    vars = Vector{Symbol}([])
+    sub_exprs = Expr[]
+    vars = Symbol[]
 
     # Traverse the expression using multiple dispatch
-    function walk_expr!(expr::Expr)
+    function walk!(expr::Expr)
         n = (expr.head == :call) ? 2 : 1    # Ignore function names
-        walk_expr!.(expr.args[n:end])       # Mind the dot
-        push!(sub_exprs, expr)
+        walk!.(expr.args[n:end])            # Mind the dot
+        expr ∉ sub_exprs && push!(sub_exprs, expr)
     end
-    walk_expr!(var::Symbol) = !(var in vars) && push!(vars, var)
-    walk_expr!(::Bool) = nothing
+    walk!(var::Symbol) = var ∉ vars && push!(vars, var)
+    walk!(::Bool) = nothing
 
-    walk_expr!(expr)
+    walk!(expr)
     return sub_exprs, vars
 end
 
 end #module
+
