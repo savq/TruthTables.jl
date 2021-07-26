@@ -1,7 +1,7 @@
 name = "TruthTables"
 uuid = "1c9253f9-820b-4eec-892b-46b33dab1577"
 authors = ["Sergio Vargas <savargasqu+git@unal.edu.co>"]
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 NamedArrays = "86f7a689-2022-50b4-a561-43c23ac3c673"
