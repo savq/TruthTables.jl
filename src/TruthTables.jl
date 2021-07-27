@@ -1,67 +1,72 @@
-# This module serves as a simple example of what macros can do.
 "TruthTables exports the macro @truth_table"
 module TruthTables
 
-# Used for pretty printing.
+## For pretty printing
 using NamedArrays: NamedArray
 
 export @truth_table
 
-# TODO: Support user defined functions
 ¬(p::Bool) = !p
 ∧(p::Bool, q::Bool) = p && q
 ∨(p::Bool, q::Bool) = p || q
 ⟹(p::Bool, q::Bool) = if p; q else true end
 ⟺(p::Bool, q::Bool) = p === q
 
-
 """
-Take a boolean expression and return a truth table
+    @truth_table predicate
 
-The truth table is a NamedArray whose columns are variables and sub-expressions
-of the input expression.
+Return the truth table of `predicate`.
+
+The `predicate` can contain built-in boolean operators, as well as user-defined boolean-valued functions.
+The truth table is a NamedArray whose columns are variables and sub-expressions of the input predicate.
 """
 macro truth_table(expr)
-    subexprs, vars = get_sub_exprs(expr)
+    sub_exprs, vars = get_sub_exprs(expr)
+    col_names = string.([vars..., sub_exprs...])
+    c = gensym(:c)
+    vals = gensym(:vals)
 
-    # Generate nested for loops where each variable is given a truth value
-    vals = []
-    ex = :(push!($vals, [$(vars...), $(subexprs...)]))    # FIXME: Preallocate vals
+    ## escape user-defined functions
+    escape_calls!.(sub_exprs)
 
+    ## Form expression
+    ex = :($vals[$c+=1, :] = [$(vars...), $(sub_exprs...)])
     for i in reverse(vars)
-        ex = quote
-            for $i in [true, false]
-                $ex
-            end
-        end
+        ex = :(for $i in [true, false]; $ex end)
     end
 
-    # Create and return truth table
-    eval(ex)
-    NamedArray(
-        Matrix(hcat(vals...)'),
-        (1:(2^length(vars)), [string.(vars)..., string.(subexprs)...]),
-        ("", "")
-    )
+    quote
+        $c = 0
+        $vals = Matrix{Bool}(undef, 2^length($vars), length($vars) + length($sub_exprs))
+        $ex
+        NamedArray($vals, (1:2^length($vars), $col_names), ("", ""))
+    end
 end
 
+function get_sub_exprs(expr)
+    sub_exprs = Expr[]
+    vars = Symbol[]
 
-"Returns two vectors: a vector of sub-expressions and a vector of variables."
-function get_sub_exprs(expr::Expr)
-    sub_exprs = Vector{Expr}([])
-    vars = Vector{Symbol}([])
-
-    # Traverse the expression using multiple dispatch
-    function walk_expr!(expr::Expr)
-        n = (expr.head == :call) ? 2 : 1    # Ignore function names
-        walk_expr!.(expr.args[n:end])       # Mind the dot
-        push!(sub_exprs, expr)
+    ## Traverse expression using multiple dispatch
+    function walk!(ex::Expr)
+        n = ex.head == :call ? 2 : 1    # Ignore function names
+        walk!.(ex.args[n:end])          # Mind the dot
+        ex ∉ sub_exprs && push!(sub_exprs, ex)
     end
-    walk_expr!(var::Symbol) = !(var in vars) && push!(vars, var)
-    walk_expr!(::Bool) = nothing
+    walk!(var::Symbol) = var ∉ vars && push!(vars, var)
+    walk!(::Bool) = nothing
 
-    walk_expr!(expr)
+    walk!(expr)
     return sub_exprs, vars
 end
 
+escape_calls!(s) = s
+function escape_calls!(ex::Expr)
+    if ex.head == :call && !isdefined(@__MODULE__, ex.args[1])
+        ex.args[1] = esc(ex.args[1])
+        ex.args[2:end] = escape_calls!.(ex.args[2:end])
+    end
+end
+
 end #module
+
