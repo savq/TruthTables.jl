@@ -27,7 +27,7 @@ macro truth_table(expr)
     vals = gensym(:vals)
 
     ## escape user-defined functions
-    escape_calls!.(sub_exprs)
+    sub_exprs = escape_calls.(sub_exprs)
 
     ## Form expression
     ex = :($vals[$c+=1, :] = [$(vars...), $(sub_exprs...)])
@@ -60,12 +60,14 @@ function get_sub_exprs(expr)
     return sub_exprs, vars
 end
 
-escape_calls!(s) = s
-function escape_calls!(ex::Expr)
-    if ex.head == :call && !isdefined(@__MODULE__, ex.args[1])
+escape_calls(s) = s
+function escape_calls(expr::Expr)
+    ex = expr
+    if ex.head == :call && ex.args[1] isa Symbol && !isdefined(@__MODULE__, ex.args[1])
         ex.args[1] = esc(ex.args[1])
-        ex.args[2:end] = escape_calls!.(ex.args[2:end])
     end
+    ex.args[2:end] = escape_calls.(ex.args[2:end])
+    ex
 end
 
 end #module
