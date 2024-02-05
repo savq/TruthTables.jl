@@ -29,11 +29,11 @@ macro truth_table(expr)
     ## escape user-defined functions
     sub_exprs = escape_calls.(sub_exprs)
 
-    ## Form expression
-    ex = :($vals[$c+=1, :] = [$(vars...), $(sub_exprs...)])
-    for i in reverse(vars)
-        ex = :(for $i in [true, false]; $ex end)
-    end
+    loop = Expr(
+        :for,
+        Expr(:block, map(v -> :($v = [true, false]), vars)...),
+        :($vals[$c+=1, :] = [$(vars...), $(sub_exprs...)]),
+    )
 
     quote
         $c = 0
